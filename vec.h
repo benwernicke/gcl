@@ -24,14 +24,13 @@
 #define GCL_FUNC(A) GCL_FUNC_(GCL_PREFIX, A)
 
 #include <stdlib.h>
-#include <stdint.h>
-#include <stdbool.h>
+#include <gcl/type.h>
 
 typedef struct GCL_TYPE GCL_TYPE;
 struct GCL_TYPE {
     GCL_VALUE_TYPE* buf;
-    uint32_t size;
-    uint32_t cap;
+    u32 size;
+    u32 cap;
 };
 
 GCL_TYPE*
@@ -59,7 +58,7 @@ int
 GCL_FUNC(_erase)(GCL_TYPE* v, GCL_VALUE_TYPE* t);
 
 int
-GCL_FUNC(_resize)(GCL_TYPE* v, uint32_t new_size);
+GCL_FUNC(_resize)(GCL_TYPE* v, u32 new_size);
 
 int
 GCL_FUNC(_shrink_to_fit)(GCL_TYPE* v);
@@ -76,22 +75,22 @@ GCL_FUNC(_end)(GCL_TYPE* v);
 GCL_VALUE_TYPE*
 GCL_FUNC(_last)(GCL_TYPE* v);
 
-uint32_t 
+u32 
 GCL_FUNC(_size)(GCL_TYPE* v);
 
-uint32_t
+u32
 GCL_FUNC(_capacity)(GCL_TYPE* v);
 
 bool
 GCL_FUNC(_empty)(GCL_TYPE* v);
 
 GCL_VALUE_TYPE* 
-GCL_FUNC(_get)(GCL_TYPE* v, uint32_t i);
+GCL_FUNC(_get)(GCL_TYPE* v, u32 i);
 
 #ifdef GCL_IMPLEMENTATION
 
 static inline int
-GCL_FUNC(_realloc_)(GCL_TYPE* v, uint32_t new_cap)
+GCL_FUNC(_realloc_)(GCL_TYPE* v, u32 new_cap)
 {
     GCL_VALUE_TYPE* new_buf = realloc(v->buf, new_cap * sizeof(*new_buf));
     if (!new_buf) return 1;
@@ -171,7 +170,7 @@ GCL_FUNC(_erase)(GCL_TYPE* v, GCL_VALUE_TYPE* t)
 }
 
 int
-GCL_FUNC(_resize)(GCL_TYPE* v, uint32_t new_size)
+GCL_FUNC(_resize)(GCL_TYPE* v, u32 new_size)
 {
     if (v->size < new_size) {
         int e = GCL_FUNC(_realloc_)(v, new_size);
@@ -211,13 +210,13 @@ GCL_FUNC(_last)(GCL_TYPE* v)
     return v->buf + v->size - 1;
 }
 
-uint32_t 
+u32 
 GCL_FUNC(_size)(GCL_TYPE* v)
 {
     return v->size;
 }
 
-uint32_t
+u32
 GCL_FUNC(_capacity)(GCL_TYPE* v)
 {
     return v->cap;
@@ -230,7 +229,7 @@ GCL_FUNC(_empty)(GCL_TYPE* v)
 }
 
 GCL_VALUE_TYPE*
-GCL_FUNC(_get)(GCL_TYPE* v, uint32_t i)
+GCL_FUNC(_get)(GCL_TYPE* v, u32 i)
 {
     return v->buf + i;
 }
