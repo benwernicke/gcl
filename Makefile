@@ -1,13 +1,16 @@
-.PHONY: all install uninstall
+DEBUG_FLAGS := -g -Wall -pedantic -fsanitize=leak -fsanitize=address -fsanitize=undefined
 
-all:
-	# Hello this is only an installation Makefile for now
-	# for examples and tests see the devel branches
-	echo " "
-	
+TARGETS := test_a.out
 
-install:
-	cp -r gcl /usr/local/include/
+.PHONY: all clean
 
-uninstall:
-	rm -rf /usr/local/include/gcl
+all: debug
+
+debug: CFLAGS = ${DEBUG_FLAGS}
+debug: ${TARGETS}
+
+test_a.out: maps/a.h test.c
+	${CC} ${CFLAGS} -o $@ test.c -D'MAP="maps/a.h"'
+
+clean:
+	rm -f *.o *.out
