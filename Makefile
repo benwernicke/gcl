@@ -101,4 +101,4 @@ b5_b.out: b5.c maps/b.h
 	${CC} ${CFLAGS} -o $@ $< -D'MAP="maps/b.h"'
 
 clean:
-	rm -f *.o *.out
+	rm -f *.o *.out *.log
