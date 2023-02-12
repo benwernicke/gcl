@@ -3,7 +3,7 @@
 all:
 	# Hello this is only an installation Makefile for now
 	# for examples and tests see the devel branches
-	echo " "
+	@echo " "
 	
 
 install:
