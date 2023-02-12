@@ -48,12 +48,12 @@
 #define GCL_FUNC(A) GCL_FUNC_(GCL_PREFIX, A)
 
 #define GCL_ENTRY_TYPE GCL_GLUE(GCL_PREFIX, _Entry)
+#define GCL_ARENA_TYPE GCL_GLUE(GCL_PREFIX, _Arena)
 
 #include <gcl/type.h>
 #include <stdlib.h>
 #include <string.h>
 
-typedef void* GCL_ITERATOR;
 
 typedef struct GCL_ENTRY_TYPE GCL_ENTRY_TYPE;
 struct GCL_ENTRY_TYPE {
@@ -65,8 +65,19 @@ struct GCL_ENTRY_TYPE {
     u32 hash;
 };
 
+typedef struct GCL_ARENA_TYPE GCL_ARENA_TYPE;
+struct GCL_ARENA_TYPE {
+    GCL_ARENA_TYPE* next;
+    GCL_ENTRY_TYPE* buf;
+    GCL_ENTRY_TYPE* stack;
+
+    u32 size;
+    u32 cap;
+};
+
 typedef struct GCL_TYPE GCL_TYPE;
 struct GCL_TYPE {
+    GCL_ARENA_TYPE* arena;
     GCL_ENTRY_TYPE** map;
     GCL_ENTRY_TYPE* begin;
     u32 size;
@@ -142,6 +153,66 @@ GCL_FUNC(_iter_key)(void* iter);
 
 #ifdef GCL_IMPLEMENTATION
 
+static inline GCL_ARENA_TYPE*
+GCL_FUNC(_arena_create_)(u32 cap)
+{
+    GCL_ARENA_TYPE* a = malloc(sizeof(*a));
+    if (!a) return NULL;
+    *a = (GCL_ARENA_TYPE) {
+        .size  = 0,
+        .cap   = cap,
+        .next  = NULL,
+        .buf   = NULL,
+        .stack = NULL,
+    };
+    a->buf = malloc(a->cap * sizeof(*a->buf));
+    if (!a->buf) {
+        free(a);
+        return NULL;
+    }
+    return a;
+}
+
+static inline GCL_ENTRY_TYPE*
+GCL_FUNC(_arena_alloc_)(GCL_ARENA_TYPE** ap)
+{
+    GCL_ARENA_TYPE* a = *ap;
+    if (a->stack) {
+        GCL_ENTRY_TYPE* e = a->stack;
+        a->stack = a->stack->next;
+        return e;
+    } else if (a->size < a->cap) {
+        GCL_ENTRY_TYPE* e = &a->buf[a->size++];
+        return e;
+    } else {
+        GCL_ARENA_TYPE* new_a = GCL_FUNC(_arena_create_)(a->cap * GCL_GROWTH_FACTOR);
+        if (!new_a) return NULL;
+        new_a->next = a;
+        *ap = new_a;
+        return GCL_FUNC(_arena_alloc_)(ap);
+    }
+}
+
+static inline void
+GCL_FUNC(_arena_free_)(GCL_ARENA_TYPE** ap, GCL_ENTRY_TYPE* e)
+{
+    GCL_ARENA_TYPE* a = *ap;
+    e->next = a->stack;
+    a->stack = e;
+}
+
+static inline void
+GCL_FUNC(_arena_release_)(GCL_ARENA_TYPE** ap)
+{
+    GCL_ARENA_TYPE* a = *ap;
+    while (a) {
+        free(a->buf);
+        GCL_ARENA_TYPE* tmp = a;
+        a = a->next;
+        free(tmp);
+    }
+}
+
 static inline GCL_ENTRY_TYPE**
 GCL_FUNC(_find_)(GCL_TYPE* m, GCL_KEY_TYPE key, u32 hash)
 {
@@ -186,7 +257,7 @@ static inline GCL_ENTRY_TYPE*
 GCL_FUNC(_create_entry_)(GCL_TYPE* m, GCL_KEY_TYPE key, 
                          GCL_VALUE_TYPE value, u32 hash) 
 {
-    GCL_ENTRY_TYPE* e = malloc(sizeof(*e));
+    GCL_ENTRY_TYPE* e = GCL_FUNC(_arena_alloc_)(&m->arena);
     if (!e) return NULL;
 
     *e = (GCL_ENTRY_TYPE) {
@@ -223,7 +294,7 @@ GCL_FUNC(_free_entry_)(GCL_TYPE* m, GCL_ENTRY_TYPE** e)
         t->prev->next = t->next;
     }
 
-    free(t);
+    GCL_FUNC(_arena_free_)(&m->arena, t);
 }
 
 GCL_TYPE*
@@ -254,19 +325,20 @@ GCL_FUNC(_init)(GCL_TYPE* m)
         .cap   = GCL_INIT_CAP / GCL_MAX_LOAD_FACTOR,
         .begin = NULL,
     };
+    m->arena = GCL_FUNC(_arena_create_)(m->cap);
+    if (!m->arena) return 1;
     m->map = calloc(m->cap, sizeof(*m->map));
-    return m->map ? 0 : 1;
+    if (!m->map) {
+        GCL_FUNC(_arena_release_)(&m->arena);
+        return 1;
+    }
+    return 0;
 }
 
 void
 GCL_FUNC(_deinit)(GCL_TYPE* m)
 {
-    GCL_ENTRY_TYPE* iter = m->begin;
-    while (iter) {
-        GCL_ENTRY_TYPE* tmp = iter;
-        iter = iter->next;
-        free(tmp);
-    }
+    GCL_FUNC(_arena_release_)(&m->arena);
     free(m->map);
 }
 
